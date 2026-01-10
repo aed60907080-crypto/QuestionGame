@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تحدي المعرفة - النسخة الاحترافية</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --accent: #f72585;
+            --success: #4cc9f0;
+            --locked: #64748b;
+        }
+        body {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            font-family: 'Cairo', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+        }
+        .quiz-card {
+            background: white;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            border: none;
+        }
+        .level-box {
+            border: 2px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            background: #fff;
+        }
+        .level-box:hover:not(.locked) {
+            border-color: var(--primary);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(67, 97, 238, 0.1);
+        }
+        .level-box.locked {
+            background: #f1f5f9;
+            cursor: not-allowed;
+            opacity: 0.8;
+        }
+        .level-box.active {
+            border-color: var(--primary);
+            background: rgba(67, 97, 238, 0.05);
+        }
+        .lock-icon {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 1.5rem;
+        }
+        .option-btn {
+            text-align: right; padding: 16px 20px; margin-bottom: 12px;
+            border: 2px solid #f1f5f9; border-radius: 15px; background: #fff;
+            transition: all 0.2s; width: 100%; font-weight: 600; font-size: 1.1rem;
+        }
+        .option-btn:hover:not([disabled]) { border-color: var(--primary); background: #f8fafc; }
+        .option-btn.correct { background-color: #d1e7dd !important; border-color: #198754 !important; color: #0f5132; }
+        .option-btn.wrong { background-color: #f8d7da !important; border-color: #dc3545 !important; color: #842029; }
+        
+        #quiz-screen, #result-screen { display: none; }
+        .timer-bar-container { height: 6px; background: #eee; width: 100%; position: relative; }
+        #timer-progress { height: 100%; background: var(--accent); width: 100%; transition: width 1s linear; }
+        
+        .question-img-container {
+            width: 100%; height: 200px; background: #f1f5f9;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        .question-img { width: 100%; height: 100%; object-fit: cover; }
+    </style>
+</head>
+<body>
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+
+            <!-- شاشة اختيار المستوى -->
+            <div id="start-screen" class="quiz-card p-4 p-md-5 animate-fade">
+                <div class="text-center mb-4">
+                    <h1 class="fw-bold text-primary">تحدي المعرفة</h1>
+                    <p class="text-muted">اختر المستوى وابدأ التحدي</p>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-12">
+                        <div class="level-box active" onclick="selectLevel(1)">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h4 class="fw-bold mb-1">المستوى الأول: العادي</h4>
+                                    <p class="mb-0 text-muted small">30 سؤال • 10 نقاط لكل إجابة</p>
+                                </div>
+                                <span class="badge bg-primary rounded-pill">مفتوح</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div id="level-2-box" class="level-box locked">
+                            <div id="lock-status" class="lock-icon">🔒</div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h4 class="fw-bold mb-1">المستوى الثاني: المتقدم</h4>
+                                    <p class="mb-0 text-muted small">30 سؤال • 15 نقطة لكل إجابة</p>
+                                </div>
+                                <span id="level-2-badge" class="badge bg-secondary rounded-pill">مغلق</span>
+                            </div>
+                            <div id="unlock-hint" class="mt-2 small text-danger fw-bold" style="display:none">
+                                تحتاج إلى 160 نقطة على الأقل في المستوى الأول لفتح هذا المستوى!
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="start-btn" class="btn btn-primary btn-lg w-100 py-3 rounded-pill fw-bold shadow">
+                    ابدأ المستوى الأول
+                </button>
+                
+                <div class="text-center mt-3">
+                    <small class="text-muted">أعلى نتيجة حققتها: <span id="high-score">0</span></small>
+                </div>
+            </div>
+
+            <!-- شاشة المسابقة -->
+            <div id="quiz-screen" class="quiz-card animate-fade">
+                <div class="p-3 bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center small">
+                        <span id="question-counter">السؤال 1 / 30</span>
+                        <span id="level-indicator">المستوى الأول</span>
+                        <span class="fw-bold">النقاط: <span id="score-counter">0</span></span>
+                    </div>
+                </div>
+                <div class="timer-bar-container">
+                    <div id="timer-progress"></div>
+                </div>
+
+                <div class="question-img-container">
+                    <img id="question-image" src="" alt="" class="question-img">
+                </div>
+
+                <div class="p-4">
+                    <h4 id="question-text" class="text-center fw-bold mb-4 lh-base">...</h4>
+                    <div id="options-container" class="d-grid gap-2"></div>
+                </div>
+            </div>
+
+            <!-- شاشة النتائج -->
+            <div id="result-screen" class="quiz-card p-5 text-center">
+                <div class="mb-4">
+                    <img id="result-img" src="https://img.icons8.com/fluency/96/trophy.png" width="80">
+                </div>
+                <h2 class="fw-bold mb-2">انتهى التحدي!</h2>
+                <div class="display-4 fw-bold text-primary mb-1" id="final-score">0</div>
+                <p id="result-comment" class="text-muted mb-4"></p>
+
+                <div class="row g-2 mb-4">
+                    <div class="col-6">
+                        <div class="bg-light p-3 rounded-3">
+                            <small class="d-block text-muted">صح</small>
+                            <span id="correct-count" class="h5 fw-bold text-success">0</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="bg-light p-3 rounded-3">
+                            <small class="d-block text-muted">خطأ</small>
+                            <span id="wrong-count" class="h5 fw-bold text-danger">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-lg w-100 rounded-pill mb-2" onclick="location.reload()">الرئيسية</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    // أسئلة المستوى الأول (10 نقاط)
+    const level1Questions = [
+        { text: "ما هي عاصمة الدولة الأموية؟", options: ["دمشق", "بغداد", "القاهرة", "مكة"], correct: 0, img: "damascus" },
+        { text: "كم عدد قلوب الأخطبوط؟", options: ["3", "1", "2", "4"], correct: 0, img: "ocean" },
+        { text: "أصلب مادة في الطبيعة؟", options: ["الألماس", "الحديد", "الفولاذ", "الذهب"], correct: 0, img: "diamond" },
+        { text: "ما هو أطول نهر في العالم؟", options: ["نهر النيل", "الأمازون", "الدانوب", "الميسيسيبي"], correct: 0, img: "river" },
+        { text: "ما هي عاصمة اليابان؟", options: ["طوكيو", "سول", "بكين", "كيوتو"], correct: 0, img: "tokyo" },
+        { text: "ما هو الكوكب الأحمر؟", options: ["المريخ", "الزهرة", "المشتري", "زحل"], correct: 0, img: "mars" },
+        { text: "كم عدد ألوان قوس قزح؟", options: ["7", "6", "5", "8"], correct: 0, img: "rainbow" },
+        { text: "أين تقع الأهرامات؟", options: ["مصر", "السودان", "المكسيك", "بيرو"], correct: 0, img: "pyramid" },
+        { text: "ما هو صوت الأسد؟", options: ["زئير", "صهيل", "نباح", "فحيح"], correct: 0, img: "lion" },
+        { text: "من مخترع المصباح؟", options: ["أديسون", "تسلا", "نيوتن", "جاليليو"], correct: 0, img: "lightbulb" },
+        { text: "ما هو المعدن السائل؟", options: ["الزئبق", "الحديد", "النحاس", "القصدير"], correct: 0, img: "mercury" },
+        { text: "عاصمة السعودية هي؟", options: ["الرياض", "جدة", "مكة", "الدمام"], correct: 0, img: "riyadh" },
+        { text: "أكبر محيط في العالم؟", options: ["الهادئ", "الأطلسي", "الهندي", "المتجمد"], correct: 0, img: "ocean" },
+        { text: "الحيوان الملقب بسفينة الصحراء؟", options: ["الجمل", "الحصان", "الفيل", "الزرافة"], correct: 0, img: "camel" },
+        { text: "كم عدد القارات؟", options: ["7", "6", "5", "8"], correct: 0, img: "world" },
+        { text: "عاصمة الأردن؟", options: ["عمان", "العقبة", "اربد", "الزرقاء"], correct: 0, img: "amman" },
+        { text: "ما هي لغة البرازيل؟", options: ["البرتغالية", "الإسبانية", "الإنجليزية", "الفرنسية"], correct: 0, img: "brazil" },
+        { text: "ما هي عملة الكويت؟", options: ["دينار", "ريال", "درهم", "دولار"], correct: 0, img: "kuwait" },
+        { text: "عضو التنفس في الأسماك؟", options: ["الخياشيم", "الرئتين", "الجلد", "الزعانف"], correct: 0, img: "fish" },
+        { text: "ما هي فاكهة الصيف الملكية؟", options: ["البطيخ", "البرتقال", "التفاح", "الفراولة"], correct: 0, img: "fruit" },
+        { text: "من هو فيلسوف العرب؟", options: ["الكندي", "الفارابي", "ابن رشد", "ابن سينا"], correct: 0, img: "philosopher" },
+        { text: "أين يوجد برج إيفل؟", options: ["فرنسا", "إيطاليا", "ألمانيا", "إسبانيا"], correct: 0, img: "paris" },
+        { text: "أسرع حيوان بري؟", options: ["الفهد", "الأسد", "الغزال", "النمور"], correct: 0, img: "cheetah" },
+        { text: "ما هو غاز الحياة؟", options: ["الأكسجين", "النيتروجين", "الهيدروجين", "ثاني أكسيد الكربون"], correct: 0, img: "oxygen" },
+        { text: "عاصمة المغرب؟", options: ["الرباط", "الدار البيضاء", "فاس", "مراكش"], correct: 0, img: "rabat" },
+        { text: "أكبر كوكب في المجموعة؟", options: ["المشتري", "زحل", "الأرض", "نبتون"], correct: 0, img: "jupiter" },
+        { text: "كم عدد أسنان الإنسان البالغ؟", options: ["32", "28", "30", "34"], correct: 0, img: "teeth" },
+        { text: "أين تقع قناة السويس؟", options: ["مصر", "الأردن", "بنما", "السعودية"], correct: 0, img: "canal" },
+        { text: "ما هو الطائر الذي لا يطير؟", options: ["النعامة", "الصقر", "العصفور", "الحمام"], correct: 0, img: "ostrich" },
+        { text: "أول من صعد للقمر؟", options: ["نيل أرمسترونج", "يوري جاجارين", "بز ألدرين", "إيلون ماسك"], correct: 0, img: "moon" }
+    ];
+
+    // أسئلة المستوى الثاني المتقدم (15 نقطة)
+    const level2Questions = [
+        { text: "ما هي المدينة التي تسمى 'مدينة التلال السبعة'؟", options: ["روما", "باريس", "لندن", "اثينا"], correct: 0, img: "rome" },
+        { text: "من هو مكتشف الدورة الدموية الصغرى؟", options: ["ابن النفيس", "ويليام هارفي", "ابن سينا", "الرازي"], correct: 0, img: "anatomy" },
+        { text: "ما هو العنصر الكيميائي الذي يرمز له بالرمز (Au)؟", options: ["الذهب", "الفضة", "النحاس", "الألمنيوم"], correct: 0, img: "chemistry" },
+        { text: "في أي سنة وقعت معركة حطين؟", options: ["1187", "1192", "1204", "1144"], correct: 0, img: "history" },
+        { text: "ما هي أعمق نقطة في محيطات العالم؟", options: ["خندق ماريانا", "خندق تونجا", "خندق بورتوريكو", "خندق جاوة"], correct: 0, img: "deep-sea" },
+        { text: "من هو مؤلف رواية 'البؤساء'؟", options: ["فيكتور هوجو", "تشارلز ديكنز", "ليو تولستوي", "دوستويفسكي"], correct: 0, img: "literature" },
+        { text: "ما هو الغاز الذي يشكل النسبة الأكبر من الغلاف الجوي؟", options: ["النيتروجين", "الأكسجين", "الأرجون", "الهيدروجين"], correct: 0, img: "atmosphere" },
+        { text: "كم عدد العظام في جسم الإنسان البالغ؟", options: ["206", "210", "195", "220"], correct: 0, img: "bones" },
+        { text: "ما هو العلم الذي يدرس الزلازل؟", options: ["السيزمولوجيا", "الجيولوجيا", "المناخ", "البيولوجيا"], correct: 0, img: "science" },
+        { text: "من هو القائد الذي فتح بلاد الأندلس؟", options: ["طارق بن زياد", "عقبة بن نافع", "خالد بن الوليد", "صلاح الدين"], correct: 0, img: "conquest" },
+        { text: "ما هو الكوكب الذي يمتلك أكبر عدد من الأقمار؟", options: ["زحل", "المشتري", "أورانوس", "نبتون"], correct: 0, img: "saturn" },
+        { text: "أين تقع شلالات نياجرا؟", options: ["بين كندا وأمريكا", "بين البرازيل والأرجنتين", "في زامبيا", "في أيسلندا"], correct: 0, img: "waterfall" },
+        { text: "ما هي الدولة التي تمتلك أكبر عدد من الجزر في العالم؟", options: ["السويد", "إندونيسيا", "الفلبين", "كندا"], correct: 0, img: "islands" },
+        { text: "من هو الرسام صاحب لوحة 'الجيرنيكا'؟", options: ["بابلو بيكاسو", "فان جوخ", "ليوناردو دافنشي", "سلفادور دالي"], correct: 0, img: "art" },
+        { text: "ما هو الحيوان الذي يستطيع رؤية الأشعة تحت الحمراء؟", options: ["الثعبان", "البومة", "القط", "الخفاش"], correct: 0, img: "vision" },
+        { text: "في أي قارة تقع صحراء جوبي؟", options: ["آسيا", "أفريقيا", "أستراليا", "أمريكا الجنوبية"], correct: 0, img: "desert" },
+        { text: "ما هو الاسم الكيميائي لملح الطعام؟", options: ["كلوريد الصوديوم", "نترات البوتاسيوم", "كربونات الكالسيوم", "كبريتات المغنيسيوم"], correct: 0, img: "salt" },
+        { text: "كم يبلغ طول سور الصين العظيم تقريباً؟", options: ["21,196 كم", "10,500 كم", "5,000 كم", "15,000 كم"], correct: 0, img: "china-wall" },
+        { text: "ما هي الدولة التي استضافت أول كأس عالم لكرة القدم؟", options: ["الأوروغواي", "البرازيل", "فرنسا", "إيطاليا"], correct: 0, img: "football" },
+        { text: "من هو العالم الذي وضع نظرية النسبية؟", options: ["ألبرت أينشتاين", "إسحاق نيوتن", "ستيفن هوكينج", "ماكس بلانك"], correct: 0, img: "einstein" },
+        { text: "ما هي أقصر مدة حمل لحيوان ثديي؟", options: ["الفأر الجرابي (12 يوماً)", "الأرنب", "الهامستر", "القط"], correct: 0, img: "animals" },
+        { text: "ما هو البحر الذي يسمى 'بحر القلزم' قديماً؟", options: ["البحر الأحمر", "البحر المتوسط", "بحر العرب", "الخليج العربي"], correct: 0, img: "history-sea" },
+        { text: "ما هو العضو الذي يستهلك أكبر قدر من الطاقة في الجسم؟", options: ["الدماغ", "القلب", "الكبد", "العضلات"], correct: 0, img: "brain" },
+        { text: "من هي أول امرأة فازت بجائزة نوبل؟", options: ["ماري كوري", "أميليا إيرهارت", "الأم تيريزا", "ملالا يوسفزي"], correct: 0, img: "nobel" },
+        { text: "ما هو أندر فصيلة دم في العالم؟", options: ["Rh-null", "O negative", "AB positive", "B negative"], correct: 0, img: "blood" },
+        { text: "كم عدد صمامات القلب في الإنسان؟", options: ["4", "2", "3", "5"], correct: 0, img: "heart" },
+        { text: "ما هو الاسم العلمي للماء؟", options: ["أكسيد الهيدروجين الثنائي", "أكسيد النيتروجين", "حمض الكبريتيك", "كلوريد الهيدروجين"], correct: 0, img: "water" },
+        { text: "أي من هذه الدول ليست عضواً في الاتحاد الأوروبي؟", options: ["سويسرا", "اليونان", "بولندا", "البرتغال"], correct: 0, img: "europe" },
+        { text: "ما هو الكوكب الذي يدور حول نفسه باتجاه عقارب الساعة؟", options: ["الزهرة", "المريخ", "زحل", "نبتون"], correct: 0, img: "venus" },
+        { text: "ما هو الحيوان الذي لا يصدر أي صوت؟", options: ["الزرافة", "الحمار الوحشي", "الكنغر", "النعامة"], correct: 0, img: "giraffe" }
+    ];
+
+    let currentLevel = 1;
+    let selectedQuestions = [];
+    let currentIdx = 0;
+    let score = 0;
+    let corrects = 0;
+    let wrongs = 0;
+    let timer;
+    let timeLeft = 60;
+    let canSelect = true;
+
+    // تهيئة البيانات
+    const highScore = parseInt(localStorage.getItem('quiz_high_score_advanced')) || 0;
+    document.getElementById('high-score').textContent = highScore;
+    checkUnlockStatus();
+
+    function checkUnlockStatus() {
+        if (highScore >= 160) {
+            const l2Box = document.getElementById('level-2-box');
+            l2Box.classList.remove('locked');
+            l2Box.setAttribute('onclick', 'selectLevel(2)');
+            document.getElementById('lock-status').textContent = '🔓';
+            document.getElementById('level-2-badge').className = 'badge bg-success rounded-pill';
+            document.getElementById('level-2-badge').textContent = 'مفتوح';
+            document.getElementById('unlock-hint').style.display = 'none';
+        } else {
+            document.getElementById('unlock-hint').style.display = 'block';
+        }
+    }
+
+    window.selectLevel = (lvl) => {
+        if (lvl === 2 && highScore < 160) return;
+        currentLevel = lvl;
+        document.querySelectorAll('.level-box').forEach(b => b.classList.remove('active'));
+        if (lvl === 1) {
+            document.querySelector('.level-box:first-child').classList.add('active');
+            document.getElementById('start-btn').textContent = 'ابدأ المستوى الأول';
+        } else {
+            document.getElementById('level-2-box').classList.add('active');
+            document.getElementById('start-btn').textContent = 'ابدأ المستوى الثاني';
+        }
+    };
+
+    document.getElementById('start-btn').onclick = () => {
+        // اختيار الأسئلة بناءً على المستوى
+        selectedQuestions = currentLevel === 1 
+            ? [...level1Questions].sort(() => Math.random() - 0.5) 
+            : [...level2Questions].sort(() => Math.random() - 0.5);
+            
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('quiz-screen').style.display = 'block';
+        document.getElementById('level-indicator').textContent = currentLevel === 1 ? 'المستوى الأول (10ن)' : 'المستوى الثاني (15ن)';
+        
+        loadQuestion();
+    };
+
+    function loadQuestion() {
+        canSelect = true;
+        timeLeft = 60;
+        const q = selectedQuestions[currentIdx];
+        
+        document.getElementById('question-counter').textContent = `السؤال ${currentIdx + 1} / 30`;
+        document.getElementById('question-text').textContent = q.text;
+        document.getElementById('question-image').src = `https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=60&w=400&q=${q.img}`;
+        
+        const container = document.getElementById('options-container');
+        container.innerHTML = '';
+        
+        const opts = q.options.map((o, i) => ({t: o, id: i}));
+        opts.sort(() => Math.random() - 0.5);
+
+        opts.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn animate-fade';
+            btn.textContent = opt.t;
+            btn.onclick = () => checkAnswer(opt.id === q.correct, btn);
+            container.appendChild(btn);
+        });
+
+        startTimer();
+    }
+
+    function startTimer() {
+        clearInterval(timer);
+        const bar = document.getElementById('timer-progress');
+        bar.style.width = '100%';
+        timer = setInterval(() => {
+            timeLeft--;
+            bar.style.width = (timeLeft / 60 * 100) + '%';
+            if (timeLeft <= 0) {
+                clearInterval(timer);
+                checkAnswer(false, null);
+            }
+        }, 1000);
+    }
+
+    function checkAnswer(isCorrect, btn) {
+        if (!canSelect) return;
+        canSelect = false;
+        clearInterval(timer);
+
+        const pointPerQ = currentLevel === 1 ? 10 : 15;
+
+        if (isCorrect) {
+            if(btn) btn.classList.add('correct');
+            score += pointPerQ;
+            corrects++;
+        } else {
+            if(btn) btn.classList.add('wrong');
+            wrongs++;
+            const correctText = selectedQuestions[currentIdx].options[selectedQuestions[currentIdx].correct];
+            document.querySelectorAll('.option-btn').forEach(b => {
+                if(b.textContent === correctText) b.classList.add('correct');
+            });
+        }
+
+        document.getElementById('score-counter').textContent = score;
+
+        setTimeout(() => {
+            currentIdx++;
+            if (currentIdx < 30) loadQuestion();
+            else finishQuiz();
+        }, 1200);
+    }
+
+    function finishQuiz() {
+        document.getElementById('quiz-screen').style.display = 'none';
+        document.getElementById('result-screen').style.display = 'block';
+        document.getElementById('final-score').textContent = score;
+        document.getElementById('correct-count').textContent = corrects;
+        document.getElementById('wrong-count').textContent = wrongs;
+
+        // تخزين النتيجة إذا كانت أعلى من السابقة (في أي مستوى لفتح القفل)
+        if (score > highScore) {
+            localStorage.setItem('quiz_high_score_advanced', score);
+        }
+
+        if (currentLevel === 1 && score >= 160) {
+            document.getElementById('result-comment').innerHTML = " 🎉 مبروك! لقد فتحت <b>المستوى الثاني</b>";
+        } else if (score >= 350) {
+            document.getElementById('result-comment').textContent = "أنت خبير في المعلومات العامة! 🏆";
+        } else {
+            document.getElementById('result-comment').textContent = "أداء ممتاز! استمر في التعلم 📚";
+        }
+    }
+</script>
+
+</body>
+</html>
